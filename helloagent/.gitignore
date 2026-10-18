@@ -1,0 +1,19 @@
+.env
+data/*.sqlite3
+data/memory_vectors/
+__pycache__/
+*/__pycache__/
+*.pyc
+
+# Local environments and browser state
+.venv/
+.drission-edge-profile/
+.edge-profile/
+.playwright-profile*/
+.ms-playwright/
+
+# Runtime output and local test artifacts
+data/traces/
+tool-output/
+*.log
+test-memory-*.sqlite3
