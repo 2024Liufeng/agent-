@@ -1,0 +1,28 @@
+# 本地密钥和项目专用浏览器资料不要提交。
+.env
+.env.*
+!.env.example
+.edge-profile/
+
+# Edit 工具自动生成的 .env 备份（含明文密钥）。
+.backups/
+
+# 本地虚拟环境、Python 缓存与测试产物。
+.venv/
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Vue/Vite 安装依赖和构建产物。
+frontend/node_modules/
+frontend/dist/
+
+# Runtime logs
+*.log
+
+.runtime/
+*.pid
+
+# Agent 执行 trace（含对话内容与本地路径）。
+memory/traces/
