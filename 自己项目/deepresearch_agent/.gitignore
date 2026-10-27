@@ -1,0 +1,26 @@
+# 本地密钥
+.env
+.env.*
+!.env.example
+!.env.local
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+# uv 锁文件（本项目用 pip + requirements.txt 安装）
+uv.lock
+
+# 前端
+frontend/node_modules/
+frontend/dist/
+
+# 研究笔记与运行产物
+backend/workspace/
+*.log
+.runtime/
+
+# 系统
+.DS_Store
+Thumbs.db
