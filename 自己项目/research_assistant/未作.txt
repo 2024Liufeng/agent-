@@ -1,0 +1,19 @@
+image_urls MVP 可以先不做。
+
+5 个引用实际只对应 2 个唯一 URL
+
+› 暂时使用 Goal3 示例的固定 "1"，等入口层升级时再接真正用户系统
+
+chat后面要接成api
+
+
+
+
+self.chat_agent = ChatAgentWithMemory(report=report)
+
+ return report
+
+ 为什么我们要self.chat_agent,而gpt chat_agent = ChatAgentWithMemory(report=report)
+
+
+ - agent.py 只负责 ResearchAssistant。 命名是gpt抽取的吗?

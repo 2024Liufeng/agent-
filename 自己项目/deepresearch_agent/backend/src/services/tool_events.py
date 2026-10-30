@@ -31,8 +31,9 @@ class ToolCallEvent:
 class ToolCallTracker:
     """Collects tool call events and converts them to SSE payloads."""
 
-    def __init__(self, notes_workspace: Optional[str]) -> None:
+    def __init__(self, notes_workspace: Optional[str], research_id: Optional[str] = None) -> None:
         self._notes_workspace = notes_workspace
+        self._research_id = research_id
         self._events: list[ToolCallEvent] = []
         self._cursor = 0
         self._lock = Lock()
@@ -73,12 +74,13 @@ class ToolCallTracker:
             self._events.append(event)
 
         logger.info(
-            "Tool call recorded: agent=%s tool=%s task_id=%s note_id=%s parsed_parameters=%s",
+            "stage=tool_call research=%s agent=%s tool=%s task=%s note=%s action=%s",
+            self._research_id,
             agent_name,
             tool_name,
             task_id,
             note_id,
-            parsed_parameters,
+            parsed_parameters.get("action", "unknown"),
         )
 
         sink = self._event_sink

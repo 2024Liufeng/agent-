@@ -36,10 +36,10 @@ class PlanningService:
             research_topic=state.research_topic,
         )
 
-        response = self._agent.run(prompt)
+        response = self._agent.run(prompt, max_tool_iterations=8)
         self._agent.clear_history()
 
-        logger.info("Planner raw output (truncated): %s", response[:500])
+        logger.debug("stage=planning_response status=received chars=%d", len(response))
 
         tasks_payload = self._extract_tasks(response)
         todo_items: List[TodoItem] = []
@@ -112,25 +112,21 @@ class PlanningService:
 
     def _extract_json_payload(self, text: str) -> Optional[dict[str, Any] | list]:
         """Try to locate and parse a JSON object or array from the text."""
-
-        start = text.find("{")
-        end = text.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            candidate = text[start : end + 1]
+        # 模型可能在 JSON 前后补一句解释；逐段解码，避免把多个对象拼成无效 JSON。
+        decoder = json.JSONDecoder()
+        for position, char in enumerate(text):
+            if char not in "{[":
+                continue
             try:
-                return json.loads(candidate)
+                candidate, _ = decoder.raw_decode(text[position:])
             except json.JSONDecodeError:
-                pass
-
-        start = text.find("[")
-        end = text.rfind("]")
-        if start != -1 and end != -1 and end > start:
-            candidate = text[start : end + 1]
-            try:
-                return json.loads(candidate)
-            except json.JSONDecodeError:
-                return None
-
+                continue
+            if isinstance(candidate, dict) and isinstance(candidate.get("tasks"), list):
+                return candidate
+            if isinstance(candidate, list) and candidate and all(
+                isinstance(item, dict) and ("query" in item or "title" in item) for item in candidate
+            ):
+                return candidate
         return None
 
     def _extract_tool_payload(self, text: str) -> Optional[dict[str, Any]]:

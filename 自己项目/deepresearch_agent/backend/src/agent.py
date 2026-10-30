@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 import re
+import time
+import uuid
 from pathlib import Path
 from queue import Empty, Queue
 from threading import Lock, Thread
@@ -22,7 +24,10 @@ from prompts import (
 from models import SummaryState, SummaryStateOutput, TodoItem
 from services.planner import PlanningService
 from services.reporter import ReportingService
-from services.search import dispatch_search, prepare_research_context
+from services.search import dispatch_search
+from services.evidence import prepare_evidence, append_source_index, validate_citations, display_citations
+from services.knowledge_base import knowledge_bases
+from services.llm_compat import ResearchLLM
 from services.summarizer import SummarizationService
 from services.tool_events import ToolCallTracker
 
@@ -32,9 +37,16 @@ logger = logging.getLogger(__name__)
 class DeepResearchAgent:
     """Coordinator orchestrating TODO-based research workflow using HelloAgents."""
 
-    def __init__(self, config: Configuration | None = None) -> None:
+    def __init__(self, config: Configuration | None = None, knowledge_base_id: str | None = None) -> None:
         """Initialise the coordinator with configuration and shared tools."""
-        self.config = config or Configuration.from_env()
+        self.config = (config or Configuration.from_env()).model_copy(deep=True)
+        self.research_id = uuid.uuid4().hex
+        self.knowledge_base_id = knowledge_base_id
+        if knowledge_base_id:
+            knowledge_bases.get(knowledge_base_id, ready=True)
+        # 每次研究使用自己的笔记目录，防止 task_1 等标签串到其他研究。
+        self.config.notes_workspace = str(Path(self.config.notes_workspace) / self.research_id)
+        logger.info("stage=research_init research=%s kb=%s", self.research_id, knowledge_base_id or "none")
         self.llm = self._init_llm()
 
         self.note_tool = (
@@ -49,10 +61,14 @@ class DeepResearchAgent:
             self.tools_registry = registry
 
         self._tool_tracker = ToolCallTracker(
-            self.config.notes_workspace if self.config.enable_notes else None
+            self.config.notes_workspace if self.config.enable_notes else None,
+            research_id=self.research_id,
         )
         self._tool_event_sink_enabled = False
         self._state_lock = Lock()
+        # 同一研究共用一套展示编号；相同证据在不同任务中仍显示同一个数字。
+        self._citation_numbers: dict[str, int] = {}
+        self._citation_keys: dict[tuple, int] = {}
 
         self.todo_agent = self._create_tool_aware_agent(
             name="研究规划专家",
@@ -104,7 +120,7 @@ class DeepResearchAgent:
             if self.config.llm_api_key:
                 llm_kwargs["api_key"] = self.config.llm_api_key
 
-        return HelloAgentsLLM(**llm_kwargs)
+        return ResearchLLM(**llm_kwargs)
 
     def _create_tool_aware_agent(self, *, name: str, system_prompt: str) -> ToolAwareSimpleAgent:
         """Instantiate a ToolAwareSimpleAgent sharing tool registry and tracker."""
@@ -125,17 +141,26 @@ class DeepResearchAgent:
     def run(self, topic: str) -> SummaryStateOutput:
         """Execute the research workflow and return the final report."""
         state = SummaryState(research_topic=topic)
+        logger.info("stage=planning research=%s status=started", self.research_id)
         state.todo_items = self.planner.plan_todo_list(state)
         self._drain_tool_events(state)
 
         if not state.todo_items:
             logger.info("No TODO items generated; falling back to single task")
             state.todo_items = [self.planner.create_fallback_task(state)]
+        logger.info("stage=planning research=%s status=completed tasks=%d", self.research_id, len(state.todo_items))
 
         for task in state.todo_items:
-            self._execute_task(state, task, emit_stream=False)
+            # _execute_task 含 yield，必须遍历才会真正执行同步研究。
+            try:
+                for _ in self._execute_task(state, task, emit_stream=False):
+                    pass
+            except Exception:
+                task.status = "failed"
+                task.notices.append("子任务执行失败，请查看服务日志")
+                logger.exception("stage=task research=%s task=%s status=failed", self.research_id, task.id)
 
-        report = self.reporting.generate_report(state)
+        report = self._generate_report(state)
         self._drain_tool_events(state)
         state.structured_report = report
         state.running_summary = report
@@ -150,6 +175,7 @@ class DeepResearchAgent:
     def run_stream(self, topic: str) -> Iterator[dict[str, Any]]:
         """Execute the workflow yielding incremental progress events."""
         state = SummaryState(research_topic=topic)
+        logger.info("stage=planning research=%s status=started", self.research_id)
         logger.debug("Starting streaming research: topic=%s", topic)
         yield {"type": "status", "message": "初始化研究流程"}
 
@@ -158,6 +184,7 @@ class DeepResearchAgent:
             yield event
         if not state.todo_items:
             state.todo_items = [self.planner.create_fallback_task(state)]
+        logger.info("stage=planning research=%s status=completed tasks=%d", self.research_id, len(state.todo_items))
 
         channel_map: dict[int, dict[str, Any]] = {}
         for index, task in enumerate(state.todo_items, start=1):
@@ -219,12 +246,14 @@ class DeepResearchAgent:
                     enqueue(event, task=task)
             except Exception as exc:  # pragma: no cover - defensive guardrail
                 logger.exception("Task execution failed", exc_info=exc)
+                task.status = "failed"
+                task.notices.append("子任务执行失败，请查看服务日志")
                 enqueue(
                     {
                         "type": "task_status",
                         "task_id": task.id,
                         "status": "failed",
-                        "detail": str(exc),
+                        "detail": "子任务执行失败，请查看服务日志",
                         "title": task.title,
                         "intent": task.intent,
                         "note_id": task.note_id,
@@ -264,7 +293,7 @@ class DeepResearchAgent:
             for thread in threads:
                 thread.join()
 
-        report = self.reporting.generate_report(state)
+        report = self._generate_report(state)
         final_step = len(state.todo_items) + 1
         for event in self._drain_tool_events(state, step=final_step):
             yield event
@@ -297,11 +326,33 @@ class DeepResearchAgent:
         """Run search + summarization for a single task."""
         task.status = "in_progress"
 
-        search_result, notices, answer_text, backend = dispatch_search(
-            task.query,
-            self.config,
-            state.research_loop_count,
-        )
+        started = time.perf_counter()
+        logger.info("stage=task research=%s task=%s status=started", self.research_id, task.id)
+        documents = []
+        notices = []
+        search_failed = False
+        # 两路检索独立处理：一路失败时，另一路的有效证据仍可用于总结。
+        if self.knowledge_base_id:
+            try:
+                documents = knowledge_bases.search(self.knowledge_base_id, task.query)
+            except Exception:
+                search_failed = True
+                notices.append("文档检索失败，本任务将使用可用的网页证据")
+                logger.exception("stage=document_search research=%s task=%s status=failed", self.research_id, task.id)
+        search_result = None
+        backend = "unavailable"
+        try:
+            logger.info("stage=web_search research=%s task=%s status=started", self.research_id, task.id)
+            search_result, web_notices, _, backend = dispatch_search(
+                task.query, self.config, state.research_loop_count,
+            )
+            notices.extend(web_notices)
+            logger.info("stage=web_search research=%s task=%s status=completed hits=%d",
+                        self.research_id, task.id, len((search_result or {}).get("results", [])))
+        except Exception:
+            search_failed = True
+            notices.append("网页检索失败，本任务将使用可用的文档证据")
+            logger.exception("stage=web_search research=%s task=%s status=failed", self.research_id, task.id)
         self._last_search_notices = notices
         task.notices = notices
 
@@ -321,15 +372,24 @@ class DeepResearchAgent:
                         "step": step,
                     }
 
-        if not search_result or not search_result.get("results"):
-            task.status = "skipped"
+        task.sources, sources_summary, context = prepare_evidence(task.id, documents, search_result)
+        self._number_sources(task.sources)
+        logger.info("stage=evidence research=%s task=%s status=completed sources=%d chars=%d",
+                    self.research_id, task.id, len(task.sources), len(context))
+        if not task.sources:
+            task.status = "failed" if search_failed else "skipped"
+            task.summary = "资料不足：本任务未获得有效证据。"
+            task.sources_summary = "暂无来源"
+            logger.warning("stage=task research=%s task=%s status=%s reason=no_evidence",
+                           self.research_id, task.id, task.status)
             if emit_stream:
                 for event in self._drain_tool_events(state, step=step):
                     yield event
                 yield {
                     "type": "task_status",
                     "task_id": task.id,
-                    "status": "skipped",
+                    "status": task.status,
+                    "detail": task.summary,
                     "title": task.title,
                     "intent": task.intent,
                     "note_id": task.note_id,
@@ -342,12 +402,6 @@ class DeepResearchAgent:
         else:
             if not emit_stream:
                 self._drain_tool_events(state)
-
-        sources_summary, context = prepare_research_context(
-            search_result,
-            answer_text,
-            self.config,
-        )
 
         task.sources_summary = sources_summary
 
@@ -364,24 +418,29 @@ class DeepResearchAgent:
             yield {
                 "type": "sources",
                 "task_id": task.id,
-                "latest_sources": sources_summary,
-                "raw_context": context,
+                "latest_sources": self._display_text(sources_summary),
+                "raw_context": self._display_text(context),
+                "sources": task.sources,
                 "step": step,
                 "backend": backend,
                 "note_id": task.note_id,
                 "note_path": task.note_path,
             }
 
+            logger.info("stage=summary research=%s task=%s status=started", self.research_id, task.id)
             summary_stream, summary_getter = self.summarizer.stream_task_summary(state, task, context)
+            summary_preview = ""
             try:
                 for event in self._drain_tool_events(state, step=step):
                     yield event
                 for chunk in summary_stream:
                     if chunk:
+                        summary_preview += chunk
                         yield {
                             "type": "task_summary_chunk",
                             "task_id": task.id,
-                            "content": chunk,
+                            "content": self._display_text(summary_preview, preview=True),
+                            "replace": True,
                             "note_id": task.note_id,
                             "step": step,
                         }
@@ -390,11 +449,15 @@ class DeepResearchAgent:
             finally:
                 summary_text = summary_getter()
         else:
+            logger.info("stage=summary research=%s task=%s status=started", self.research_id, task.id)
             summary_text = self.summarizer.summarize_task(state, task, context)
             self._drain_tool_events(state)
 
         task.summary = summary_text.strip() if summary_text else "暂无可用信息"
+        validate_citations(task.summary, task.sources)
         task.status = "completed"
+        logger.info("stage=task research=%s task=%s status=completed elapsed=%.2fs",
+                    self.research_id, task.id, time.perf_counter() - started)
 
         if emit_stream:
             for event in self._drain_tool_events(state, step=step):
@@ -403,14 +466,40 @@ class DeepResearchAgent:
                 "type": "task_status",
                 "task_id": task.id,
                 "status": "completed",
-                "summary": task.summary,
-                "sources_summary": task.sources_summary,
+                "summary": self._display_text(task.summary),
+                "sources_summary": self._display_text(task.sources_summary),
+                "sources": task.sources,
                 "note_id": task.note_id,
                 "note_path": task.note_path,
                 "step": step,
             }
         else:
             self._drain_tool_events(state)
+
+    def _number_sources(self, sources: list[dict]) -> None:
+        """按首次出现顺序编号，锁保护多个子任务同时登记来源的情况。"""
+        with self._state_lock:
+            for source in sources:
+                key = (source["type"], source["url"], source.get("chunk_id"))
+                if key not in self._citation_keys:
+                    self._citation_keys[key] = len(self._citation_keys) + 1
+                number = self._citation_keys[key]
+                source["display_number"] = number
+                self._citation_numbers[source["id"]] = number
+
+    def _display_text(self, text: str | None, *, preview: bool = False) -> str:
+        return display_citations(text or "", self._citation_numbers, preview=preview)
+
+    def _generate_report(self, state: SummaryState) -> str:
+        started = time.perf_counter()
+        logger.info("stage=report research=%s status=started", self.research_id)
+        # 没有证据时直接说明不足，避免让模型凭空生成整篇报告。
+        report = self.reporting.generate_report(state) if any(t.sources for t in state.todo_items) else ""
+        validate_citations(report, [source for task in state.todo_items for source in task.sources])
+        report = append_source_index(report, state.todo_items)
+        logger.info("stage=report research=%s status=completed elapsed=%.2fs",
+                    self.research_id, time.perf_counter() - started)
+        return report
 
     def _drain_tool_events(
         self,
@@ -437,8 +526,9 @@ class DeepResearchAgent:
             "intent": task.intent,
             "query": task.query,
             "status": task.status,
-            "summary": task.summary,
-            "sources_summary": task.sources_summary,
+            "summary": self._display_text(task.summary),
+            "sources_summary": self._display_text(task.sources_summary),
+            "sources": task.sources,
             "note_id": task.note_id,
             "note_path": task.note_path,
             "stream_token": task.stream_token,
@@ -485,6 +575,7 @@ class DeepResearchAgent:
             return None
 
         state.report_note_id = note_id
+        logger.info("stage=report_note research=%s status=saved note=%s", self.research_id, note_id)
         if self.config.notes_workspace:
             note_path = Path(self.config.notes_workspace) / f"{note_id}.md"
             state.report_note_path = str(note_path)

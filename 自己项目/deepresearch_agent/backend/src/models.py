@@ -19,6 +19,7 @@ class TodoItem:
     summary: Optional[str] = field(default=None)
     sources_summary: Optional[str] = field(default=None)
     notices: list[str] = field(default_factory=list)
+    sources: list[dict] = field(default_factory=list)
     note_id: Optional[str] = field(default=None)
     note_path: Optional[str] = field(default=None)
     stream_token: Optional[str] = field(default=None)

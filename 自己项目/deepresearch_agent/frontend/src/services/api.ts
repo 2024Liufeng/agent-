@@ -4,6 +4,30 @@ const baseURL =
 export interface ResearchRequest {
   topic: string;
   search_api?: string;
+  knowledge_base_id?: string;
+}
+
+export interface KnowledgeBase {
+  id: string;
+  name: string;
+  status: string;
+  chunk_count: number;
+  error?: string;
+}
+
+// 文档链接由后端提供相对路径，转换成当前后端的地址。
+export function sourceURL(path: string): string {
+  if (path.startsWith('/knowledge-bases/')) return `${baseURL}${path}`;
+  return /^https?:\/\//i.test(path) ? path : '';
+}
+
+export async function uploadPDF(file: File): Promise<KnowledgeBase> {
+  const body = new FormData();
+  body.append('file', file);
+  const response = await fetch(`${baseURL}/knowledge-bases`, { method: 'POST', body });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || '资料导入失败');
+  return data;
 }
 
 export interface ResearchStreamEvent {

@@ -20,6 +20,7 @@ frontend/dist/
 backend/workspace/
 *.log
 .runtime/
+notes/
 
 # 系统
 .DS_Store

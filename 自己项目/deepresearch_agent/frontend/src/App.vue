@@ -34,6 +34,9 @@
             ></textarea>
           </label>
 
+          <KnowledgeBasePanel v-model="form.knowledgeBaseId" v-model:document="researchDocument"
+            :disabled="loading" @busy="importing = $event" />
+
           <section class="options">
             <label class="field option">
               <span>搜索引擎</span>
@@ -51,7 +54,7 @@
           </section>
 
           <div class="form-actions">
-            <button class="submit" type="submit" :disabled="loading">
+            <button class="submit" type="submit" :disabled="loading || importing">
               <span class="submit-label">
                 <svg
                   v-if="loading"
@@ -253,6 +256,7 @@
                     >
                       {{ item.title || item.url || `来源 ${index + 1}` }}
                     </a>
+                    <small v-if="item.kind">{{ item.kind === 'document' ? '文档片段' : '网页来源' }}</small>
                     <div v-if="item.snippet || item.raw" class="source-tooltip">
                       <p v-if="item.snippet">{{ item.snippet }}</p>
                       <p v-if="item.raw" class="muted-text">{{ item.raw }}</p>
@@ -337,9 +341,12 @@
 
 <script lang="ts" setup>
 import { computed, onBeforeUnmount, reactive, ref } from "vue";
+import KnowledgeBasePanel from './components/KnowledgeBasePanel.vue';
 
 import {
   runResearchStream,
+  sourceURL,
+  type KnowledgeBase,
   type ResearchStreamEvent
 } from "./services/api";
 
@@ -348,6 +355,7 @@ interface SourceItem {
   url: string;
   snippet: string;
   raw: string;
+  kind?: string;
 }
 
 interface ToolCallLog {
@@ -378,8 +386,13 @@ interface TodoTaskView {
 
 const form = reactive({
   topic: "",
-  searchApi: ""
+  searchApi: "",
+  knowledgeBaseId: ""
 });
+
+const importing = ref(false);
+// 返回首页时组件会重新挂载，资料名称与 ID 一起保存在父组件。
+const researchDocument = ref<KnowledgeBase | null>(null);
 
 const loading = ref(false);
 const error = ref("");
@@ -410,7 +423,8 @@ const TASK_STATUS_LABEL: Record<string, string> = {
   pending: "待执行",
   in_progress: "进行中",
   completed: "已完成",
-  skipped: "已跳过"
+  skipped: "已跳过",
+  failed: "执行失败"
 };
 
 function formatTaskStatus(status: string): string {
@@ -669,6 +683,7 @@ function upsertTaskMetadata(task: TodoTaskView, payload: Record<string, unknown>
 }
 
 const handleSubmit = async () => {
+  if (importing.value) return;
   if (!form.topic.trim()) {
     error.value = "请输入研究主题";
     return;
@@ -689,7 +704,8 @@ const handleSubmit = async () => {
 
   const payload = {
     topic: form.topic.trim(),
-    search_api: form.searchApi || undefined
+    search_api: form.searchApi || undefined,
+    knowledge_base_id: form.knowledgeBaseId || undefined
   };
 
   try {
@@ -804,11 +820,25 @@ const handleSubmit = async () => {
               task.sourcesSummary = event.sources_summary.trim();
               task.sourceItems = parseSources(task.sourcesSummary);
             }
+            if (Array.isArray(event.sources)) {
+              task.sourceItems = event.sources.map(value => {
+                const item = value as Record<string, unknown>;
+                return {
+                  title: `[${item.display_number}] ${item.title}`,
+                  url: sourceURL(String(item.url || '')),
+                  snippet: String(item.content || ''),
+                  raw: item.chunk_id ? `片段 ${item.chunk_id}，字符 ${item.start}–${item.end}` : '',
+                  kind: String(item.type || '')
+                };
+              });
+            }
             progressLogs.value.push(`完成任务：${task.title}`);
             if (activeTaskId.value === task.id) {
               pulse(summaryHighlight);
               pulse(sourcesHighlight);
             }
+          } else if (status === "failed") {
+            progressLogs.value.push(`任务失败：${task.title}`);
           } else if (status === "skipped") {
             progressLogs.value.push(`任务跳过：${task.title}`);
           }
@@ -840,6 +870,20 @@ const handleSubmit = async () => {
             progressLogs.value.push(`已更新任务来源：${task.title}`);
           }
 
+          // 新接口返回完整的来源对象，文档来源可直接打开原 PDF。
+          if (Array.isArray(payload.sources)) {
+            task.sourceItems = payload.sources.map(value => {
+              const item = value as Record<string, unknown>;
+              return {
+                title: `[${item.display_number}] ${item.title}`,
+                url: sourceURL(String(item.url || '')),
+                snippet: String(item.content || ''),
+                raw: item.chunk_id ? `片段 ${item.chunk_id}，字符 ${item.start}–${item.end}` : '',
+                kind: String(item.type || '')
+              };
+            });
+          }
+
           if (typeof payload.backend === "string") {
             progressLogs.value.push(
               `当前使用搜索后端：${payload.backend}`
@@ -859,7 +903,8 @@ const handleSubmit = async () => {
           }
           const chunk =
             typeof event.content === "string" ? event.content : "";
-          task.summary += chunk;
+          // 后端发送累计正文，避免引用被分成多个片段时显示出内部编号。
+          task.summary = payload.replace === true ? chunk : task.summary + chunk;
           applyNoteMetadata(task, payload);
           if (activeTaskId.value === task.id) {
             pulse(summaryHighlight);
@@ -1089,6 +1134,8 @@ onBeforeUnmount(() => {
 }
 
 .panel-centered {
+  /* 小屏改成纵向 flex 后，让表单按内容增高，避免新增资料区域被裁掉。 */
+  flex: 0 0 auto;
   width: 100%;
   max-width: 600px;
   padding: 40px;

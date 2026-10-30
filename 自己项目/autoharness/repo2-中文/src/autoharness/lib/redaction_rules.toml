@@ -1,0 +1,46 @@
+# 出口脱敏红线规则集——由 CAP 出口和 LED 证据出口共享的唯一来源（config 指向它，redact 消费它）。
+# 每个条目是一个命名正则；redact 会把整个匹配替换为 [REDACTED:<category>:<name>]。
+# 过度脱敏是安全方向（宁可丢掉过多内容）；新规则只添加在这里，不要散落到代码中。
+
+[[secret]]
+name = "aws_access_key_id"
+pattern = '''AKIA[0-9A-Z]{16}'''
+
+[[secret]]
+name = "private_key_block"
+pattern = '''-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|\Z)'''
+
+[[secret]]
+name = "github_token"
+pattern = '''gh[posru]_[A-Za-z0-9]{20,}'''
+
+[[secret]]
+name = "slack_token"
+pattern = '''xox[abprs]-[A-Za-z0-9-]{10,}'''
+
+[[secret]]
+name = "bearer_token"
+pattern = '''(?i)bearer\s+[A-Za-z0-9._-]{20,}'''
+
+[[secret]]
+name = "api_key_assignment"
+pattern = '''(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*['"]?[A-Za-z0-9._\-/+]{12,}'''
+
+[[pii]]
+name = "email"
+pattern = '''[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'''
+
+[[pii]]
+name = "ssn"
+pattern = '''(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)'''
+
+[[pii]]
+name = "us_phone"
+pattern = '''(?<!\d)(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}(?!\d)'''
+
+[[pii]]
+name = "credit_card"
+pattern = '''(?<!\d)(?:\d[ -]?){13,16}(?!\d)'''
+# Luhn 校验门：校验和失败的 13–16 位数字串（Snowflake ID、毫秒时间戳、数字主键）
+# 继续作为证据留在流中；真实卡号按构造会通过校验。
+validate = "luhn"

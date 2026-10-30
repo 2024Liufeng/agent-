@@ -1,0 +1,22 @@
+{
+  "name": "autoharness",
+  "version": "0.5.3",
+  "description": "面向 Agent skill 层的按符号维护优化器——从真实运行中学习 skill，并根据实际使用中的遵循情况保留它们，而不是根据离线评估分数。",
+  "author": {
+    "name": "Tigerless Labs"
+  },
+  "homepage": "https://github.com/tigerless-labs/autoharness",
+  "license": "MIT",
+  "mcpServers": {
+    "stage_skill": {
+      "command": "python3",
+      "args": [
+        "-m",
+        "autoharness.stage_skill.server"
+      ],
+      "env": {
+        "PYTHONPATH": "${CLAUDE_PLUGIN_ROOT}/src"
+      }
+    }
+  }
+}

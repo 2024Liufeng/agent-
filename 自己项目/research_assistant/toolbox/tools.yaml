@@ -1,0 +1,49 @@
+sources:
+  research-pg-source:
+    kind: postgres
+    host: 127.0.0.1
+    port: 5432
+    database: toolbox_db
+    user: toolbox_user
+    password: jiewly123
+
+tools:
+  save-research-source:
+    kind: postgres-sql
+    source: research-pg-source
+    description: Save one scraped research source.
+    parameters:
+      - name: url
+        type: string
+        description: The source URL.
+      - name: title
+        type: string
+        description: The page title.
+      - name: raw_content
+        type: string
+        description: The cleaned page content.
+    statement: >-
+      INSERT INTO research_sources (url, title, raw_content)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (url) DO UPDATE SET
+        title = EXCLUDED.title,
+        raw_content = EXCLUDED.raw_content
+      RETURNING id, url, title
+
+  get-research-source-by-url:
+    kind: postgres-sql
+    source: research-pg-source
+    description: Get one cached research source by its exact URL.
+    parameters:
+      - name: url
+        type: string
+        description: The exact source URL.
+    statement: >-
+      SELECT url, title, raw_content
+      FROM research_sources
+      WHERE url = $1
+
+toolsets:
+  research-cache-toolset:
+    - save-research-source
+    - get-research-source-by-url

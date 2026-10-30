@@ -59,12 +59,15 @@ class ReportingService:
         prompt = (
             f"研究主题：{state.research_topic}\n"
             f"任务概览：\n{''.join(tasks_block)}\n"
+            "仅汇总有证据支持的结论；失败或跳过的任务要说明资料不足。"
+            "沿用任务中的 [T任务号-D编号] 和 [T任务号-W编号]，不要改写引用标识或编造来源。\n"
+            "内部编号只用于方括号引用，正文和来源名称不要再次解释或展开内部编号、知识库 ID、片段哈希；系统会统一转换成数字引用。\n"
             f"可用任务笔记：\n{notes_section}\n"
             f"请针对每条任务笔记使用格式：[TOOL_CALL:note:{read_template}] 读取内容，整合所有信息后撰写报告。\n"
             f"如需输出汇总结论，可追加调用：[TOOL_CALL:note:{create_conclusion_template}] 保存报告要点。"
         )
 
-        response = self._agent.run(prompt)
+        response = self._agent.run(prompt, max_tool_iterations=8)
         self._agent.clear_history()
 
         report_text = response.strip()
