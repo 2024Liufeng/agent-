@@ -1,0 +1,16 @@
+{
+  "site_id": "elink",
+  "site_name": "易联供应链平台",
+  "adapter": "elink",
+  "columns": [
+    {"id": "bid_ann", "name": "招标公告", "group": "招标采购", "url": "https://elink.chinasatnet.com.cn/ebPortal/notice/bid/ann", "list_api": "/home/api/visitor/eb/bid/annList"},
+    {"id": "bid_candidate", "name": "中标候选人公示", "group": "招标采购", "url": "https://elink.chinasatnet.com.cn/ebPortal/notice/bid/ann", "list_api": "/home/api/visitor/eb/bid/candidateList"},
+    {"id": "bid_result", "name": "中标结果公告", "group": "招标采购", "url": "https://elink.chinasatnet.com.cn/ebPortal/notice/bid/ann", "list_api": "/home/api/visitor/eb/bid/pubWinResultList"},
+    {"id": "bid_change", "name": "变更公告", "group": "招标采购", "url": "https://elink.chinasatnet.com.cn/ebPortal/notice/bid/ann", "list_api": "/home/api/visitor/eb/bid/changeAnnList"},
+    {"id": "bid_termination", "name": "终止公告", "group": "招标采购", "url": "https://elink.chinasatnet.com.cn/ebPortal/notice/bid/ann", "list_api": "/home/api/visitor/eb/bid/terminationList"},
+    {"id": "nonbid_compare", "name": "比选公告", "group": "非招标采购", "url": "https://elink.chinasatnet.com.cn/ebPortal/notice/nonbid/compare", "list_api": "/home/api/visitor/eb/nonBid/compareList"},
+    {"id": "nonbid_bidding", "name": "竞价公告", "group": "非招标采购", "url": "https://elink.chinasatnet.com.cn/ebPortal/notice/nonbid/compare", "list_api": "/home/api/visitor/eb/nonBid/competeList"},
+    {"id": "nonbid_change", "name": "变更公告", "group": "非招标采购", "url": "https://elink.chinasatnet.com.cn/ebPortal/notice/nonbid/compare", "list_api": "/home/api/visitor/eb/nonBid/changeList"},
+    {"id": "nonbid_termination", "name": "终止公告", "group": "非招标采购", "url": "https://elink.chinasatnet.com.cn/ebPortal/notice/nonbid/compare", "list_api": "/home/api/visitor/eb/nonBid/terminationList"}
+  ]
+}
