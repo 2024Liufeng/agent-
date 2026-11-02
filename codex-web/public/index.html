@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="theme-color" content="#f7f7f5" />
+    <meta name="color-scheme" content="light" />
+    <title>Codex · 随时继续</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <svg hidden aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" /></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></symbol>
+      <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" /></symbol>
+      <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5" /><path d="m11 6-6 6 6 6" /></symbol>
+      <symbol id="i-compose" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z" /><path d="m13.5 6.5 4 4" /></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" /></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7" /></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5A2.5 2.5 0 0 1 6 5h4l2 2.5h6a2.5 2.5 0 0 1 2.5 2.5v7a2.5 2.5 0 0 1-2.5 2.5H6a2.5 2.5 0 0 1-2.5-2.5Z" /></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5" /><path d="m6 11 6-6 6 6" /></symbol>
+      <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" /></symbol>
+      <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5c.6 4.2 2.3 5.9 6.5 6.5-4.2.6-5.9 2.3-6.5 6.5-.6-4.2-2.3-5.9-6.5-6.5 4.2-.6 5.9-2.3 6.5-6.5Z" /></symbol>
+    </svg>
+
+    <div class="app">
+      <header class="topbar">
+        <button id="menu" class="icon-button" type="button" aria-label="打开对话历史" aria-controls="history" aria-expanded="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-menu" /></svg>
+        </button>
+        <button id="workspace-button" class="workspace-button" type="button" aria-haspopup="dialog" aria-controls="workspace-sheet">
+          <span id="workspace-name">工作区</span>
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron" /></svg>
+        </button>
+        <button id="new" class="icon-button" type="button" aria-label="新建对话" title="新建对话">
+          <svg class="icon" aria-hidden="true"><use href="#i-compose" /></svg>
+        </button>
+      </header>
+
+      <main id="conversation" class="conversation">
+        <div id="welcome" class="welcome">
+          <div class="welcome-mark"><svg class="icon" aria-hidden="true"><use href="#i-sparkle" /></svg></div>
+          <h1>今天想做什么？</h1>
+          <p id="welcome-workspace">当前工作区</p>
+        </div>
+        <div id="messages" class="messages" aria-live="polite"></div>
+      </main>
+
+      <footer class="composer-area">
+        <div id="activity" class="activity" role="status" hidden></div>
+        <form id="composer" class="composer">
+          <textarea id="prompt" rows="1" placeholder="给 Codex 发消息…" aria-label="消息内容" maxlength="50000"></textarea>
+          <div class="composer-row">
+            <button id="model-button" class="model-button" type="button" aria-haspopup="dialog" aria-controls="model-sheet">
+              <span id="model-chip-name">模型</span>
+              <svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron" /></svg>
+            </button>
+            <div class="composer-actions">
+              <button id="stop" class="stop-button" type="button" aria-label="停止执行" hidden>
+                <svg class="icon" aria-hidden="true"><use href="#i-stop" /></svg>
+              </button>
+              <button id="send" class="send-button" type="submit" aria-label="发送消息">
+                <svg class="icon" aria-hidden="true"><use href="#i-send" /></svg>
+              </button>
+            </div>
+          </div>
+        </form>
+      </footer>
+    </div>
+
+    <div id="drawer-backdrop" class="backdrop" hidden></div>
+    <aside id="history" class="drawer" aria-label="对话历史" aria-hidden="true" hidden>
+      <header class="drawer-head">
+        <h2>对话</h2>
+        <button id="close-menu" class="icon-button" type="button" aria-label="关闭对话历史">
+          <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+        </button>
+      </header>
+      <label class="search-field">
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#i-search" /></svg>
+        <input id="history-search" type="search" placeholder="搜索对话" aria-label="搜索对话" autocomplete="off" />
+      </label>
+      <div id="sessions" class="session-list"></div>
+      <footer class="drawer-foot">
+        <button id="settings-button" class="drawer-action" type="button">
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-settings" /></svg>
+          <span>设置</span>
+        </button>
+      </footer>
+    </aside>
+
+    <div id="sheet-backdrop" class="backdrop" hidden></div>
+
+    <section id="workspace-sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="workspace-title" hidden>
+      <header class="sheet-head">
+        <h2 id="workspace-title">工作区</h2>
+        <button class="icon-button" type="button" data-close-sheet="workspace-sheet" aria-label="关闭工作区">
+          <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+        </button>
+      </header>
+      <div class="sheet-body">
+        <p class="sheet-label">最近工作区</p>
+        <div id="workspace-list" class="workspace-list"></div>
+      </div>
+      <footer class="sheet-foot">
+        <button id="open-folder" class="wide-button" type="button">
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-folder" /></svg>
+          <span>打开文件夹</span>
+        </button>
+      </footer>
+    </section>
+
+    <section id="folder-sheet" class="sheet sheet-tall" role="dialog" aria-modal="true" aria-labelledby="folder-title" hidden>
+      <header class="sheet-head">
+        <button id="folder-back" class="icon-button" type="button" aria-label="返回上一级目录">
+          <svg class="icon" aria-hidden="true"><use href="#i-back" /></svg>
+        </button>
+        <h2 id="folder-title">选择项目目录</h2>
+        <button class="icon-button" type="button" data-close-sheet="folder-sheet" aria-label="关闭文件夹选择">
+          <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+        </button>
+      </header>
+      <div class="folder-tools">
+        <nav id="folder-breadcrumbs" class="breadcrumbs" aria-label="目录路径"></nav>
+        <div id="folder-roots" class="roots" aria-label="快捷位置"></div>
+        <label class="search-field">
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-search" /></svg>
+          <input id="folder-search" type="search" placeholder="搜索当前文件夹" aria-label="搜索当前文件夹" autocomplete="off" />
+        </label>
+      </div>
+      <div id="folder-list" class="folder-list" aria-live="polite"></div>
+      <p id="folder-error" class="error-text" role="alert"></p>
+      <footer class="sheet-foot folder-foot">
+        <div class="folder-current">
+          <span class="sheet-label">当前路径</span>
+          <span id="folder-path" class="path-text">尚未选择</span>
+        </div>
+        <button id="use-folder" class="primary-button" type="button" disabled>使用此目录</button>
+      </footer>
+    </section>
+
+    <section id="model-sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="model-title" hidden>
+      <header class="sheet-head">
+        <h2 id="model-title">模型设置</h2>
+        <button class="icon-button" type="button" data-close-sheet="model-sheet" aria-label="关闭模型设置">
+          <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+        </button>
+      </header>
+      <div class="sheet-body">
+        <p class="sheet-label">模型</p>
+        <div id="model-list" class="option-list" role="radiogroup" aria-label="模型"></div>
+        <p class="sheet-label">思考强度</p>
+        <div id="effort-options" class="segmented" role="group" aria-label="思考强度"></div>
+        <p id="effort-note" class="help-text"></p>
+        <div class="switch-row">
+          <div>
+            <span>Fast 加速</span>
+            <p id="fast-note" class="help-text"></p>
+          </div>
+          <button id="fast-toggle" class="switch" type="button" role="switch" aria-checked="false" aria-label="Fast 加速">
+            <span class="switch-knob"></span>
+          </button>
+        </div>
+        <button id="advanced-open" class="nav-row" type="button">
+          <span>高级运行设置</span>
+          <svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-right" /></svg>
+        </button>
+        <p id="model-error" class="error-text" role="alert"></p>
+      </div>
+      <footer class="sheet-foot">
+        <button id="save-model" class="primary-button" type="button">完成</button>
+      </footer>
+    </section>
+
+    <section id="advanced-sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="advanced-title" hidden>
+      <header class="sheet-head">
+        <button id="advanced-back" class="icon-button" type="button" aria-label="返回模型设置">
+          <svg class="icon" aria-hidden="true"><use href="#i-back" /></svg>
+        </button>
+        <h2 id="advanced-title">高级运行设置</h2>
+        <button class="icon-button" type="button" data-close-sheet="advanced-sheet" aria-label="关闭高级设置">
+          <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+        </button>
+      </header>
+      <div class="sheet-body">
+        <div class="switch-row">
+          <div>
+            <span>DeepSeek 自动协作</span>
+            <p class="help-text">把具体执行交给 DSH，并在本会话继续。</p>
+          </div>
+          <button id="dsh-enabled" class="switch" type="button" role="switch" aria-checked="true" aria-label="DeepSeek 自动协作">
+            <span class="switch-knob"></span>
+          </button>
+        </div>
+        <div class="switch-row">
+          <div>
+            <span>YOLO 完整访问</span>
+            <p class="help-text">关闭后仅允许工作区写入，不自动提权。</p>
+          </div>
+          <button id="yolo" class="switch" type="button" role="switch" aria-checked="true" aria-label="YOLO 完整访问">
+            <span class="switch-knob"></span>
+          </button>
+        </div>
+        <p id="usage-text" class="usage-text">尚无运行时用量。</p>
+        <label class="field">
+          上下文限制（留空为自动）
+          <input id="context-limit" type="number" min="1024" step="1" inputmode="numeric" placeholder="自动" />
+        </label>
+        <label class="field">
+          自动压缩阈值（tokens）
+          <input id="compact-limit" type="number" min="1024" step="1" inputmode="numeric" placeholder="自动" />
+        </label>
+        <p class="help-text">留空时采用服务端配置；上限不能超过模型容量，运行时窗口另行列示。</p>
+        <div class="switch-row">
+          <div>
+            <span>用于新会话</span>
+            <p class="help-text">同时保存为新会话的默认值。</p>
+          </div>
+          <button id="save-default" class="switch" type="button" role="switch" aria-checked="false" aria-label="用于新会话">
+            <span class="switch-knob"></span>
+          </button>
+        </div>
+        <p id="advanced-error" class="error-text" role="alert"></p>
+      </div>
+      <footer class="sheet-foot">
+        <button id="save-advanced" class="primary-button" type="button">保存</button>
+      </footer>
+    </section>
+
+    <section id="settings-sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
+      <header class="sheet-head">
+        <h2 id="settings-title">设置</h2>
+        <button class="icon-button" type="button" data-close-sheet="settings-sheet" aria-label="关闭设置">
+          <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+        </button>
+      </header>
+      <div class="sheet-body">
+        <p class="sheet-label">工作区</p>
+        <div class="workspace-target">
+          <strong id="settings-workspace-name">工作区</strong>
+          <span id="settings-workspace-path" class="path-text"></span>
+        </div>
+        <label class="field">
+          项目偏好 · <span id="preferences-workspace-name">当前工作区</span>
+          <textarea id="project-preferences" rows="5" maxlength="8000" placeholder="项目偏好会随每轮对话带入"></textarea>
+        </label>
+        <button id="save-preferences" class="secondary-button" type="button">保存项目偏好</button>
+        <p id="preferences-status" class="help-text" role="status"></p>
+        <div class="connection-row">
+          <div>
+            <span>Codex 连接</span>
+            <p id="connection-text" class="help-text">正在连接</p>
+          </div>
+          <span id="connection-dot" class="status-dot" aria-hidden="true"></span>
+        </div>
+      </div>
+    </section>
+
+    <dialog id="login" class="login-dialog">
+      <form id="login-form">
+        <h2>连接工作台</h2>
+        <p class="help-text">输入服务器访问令牌</p>
+        <input id="token" type="password" autocomplete="current-password" aria-label="访问令牌" placeholder="访问令牌" />
+        <p id="login-error" class="error-text" role="alert"></p>
+        <button id="connect" class="primary-button" type="submit">连接</button>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <script src="/vendor/marked.umd.js"></script>
+    <script src="/vendor/purify.min.js"></script>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

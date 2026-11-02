@@ -1,0 +1,25 @@
+- id: acp
+  config:
+    provider: ark-coding
+    model: !!js process.env.DSH_MODEL || 'deepseek-v4-1-flash-261017'
+
+- id: llm-pi-ai
+  config:
+    providers:
+      ark-coding:
+        displayName: 方舟 Coding · DeepSeek 1017
+        apiKeyEnv: ARK_API_KEY
+        api: openai-completions
+        baseURL: https://ark.cn-beijing.volces.com/api/coding/v3
+        defaultMaxTokens: 32768
+        reasoning: 'off'
+        compat:
+          thinkingFormat: deepseek
+        models:
+          - id: !!js process.env.DSH_MODEL || 'deepseek-v4-1-flash-261017'
+            name: DeepSeek V4.1 Flash 1017
+            contextWindow: 262144
+            reasoningEfforts:
+              'off': 'off'
+              low: low
+              high: high

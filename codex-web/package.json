@@ -1,0 +1,16 @@
+{
+  "name": "codex-mobile-workspace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check server.mjs && node --check codex.mjs && node --check storage.mjs && node --check dsh.mjs && node --check worker-client.mjs && node --check public/app.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "dompurify": "3.4.17",
+    "marked": "18.1.2"
+  }
+}
